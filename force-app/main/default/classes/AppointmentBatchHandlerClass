@@ -1,0 +1,59 @@
+/*REQUIREMENTS: 
+===> Develop Schedulable Apex Batch - Write a Schedulable  Apex Batch which should purge(delete) all the event records which are more than 2 months old & have been Organized. 
+===> Hint - Use End Date of the Event & live? checkbox of Event Record. 
+===> In the finish method of the batch apex sends an email to the “Public Group“ email address saying that execution of the batch has been processed.  
+===> (Run every 3.00AM automatically)
+1. A handler class must be used for the batch. 
+2. Send Email from the finish method as outlined in the requirement .
+3.Create a Public Group named  “Daily Job”.
+a.Add two active users into the Public Group.
+b.Email those users.*/
+public class AppointmentBatchHandlerClass implements Database.Batchable<sObject> {
+   
+    //1. start method.
+    public database.QueryLocator start(Database.BatchableContext bc){
+        //soql to fetch records.
+        //on appointment records
+       //system.debug('Batch started. ');
+   
+       
+        //date d=date.today().adddays(-60);        
+        Database.QueryLocator q1 = database.getQueryLocator([SELECT Id, LastModifiedDate, Status__c, Live__c, End_Date_Time__c FROM Appointment__c where status__c = 'Completed' AND End_Date_Time__c < LAST_N_DAYS:60]);
+        return q1;
+    }
+    //2. execute method.
+    public void execute(Database.BatchableContext bc, list<Appointment__c> scope){
+        system.debug('scope');
+        List<Appointment__c> deleteAppointments = new List<Appointment__c>();
+        for (Appointment__c eachApp : scope) {
+            if(eachApp.status__c =='completed' && eachApp.End_Date_Time__c <= date.today().adddays(-60)) {
+                //eachApp.End_Date_Time__c == date.today().adddays(-60) && 
+                //&& eachApp.Live__c!=true
+                deleteAppointments.add(eachApp);
+            }   
+        }
+        if (!deleteAppointments.isEmpty()) {
+            delete deleteAppointments;
+            system.debug(deleteAppointments);
+            
+        }
+    }
+      //3. finish method.
+    public void finish(Database.BatchableContext bc){
+        Messaging.SingleEmailMessage message = new Messaging.SingleEmailMessage();
+
+        message.toAddresses = new String[] { 'adembalaban@gmail.com' };
+        message.subject = 'Appointment completed date';
+        message.plainTextBody = 'Dear user, all  appointments completed  in more than 2 months are deleted ';
+        Messaging.SingleEmailMessage[] messages = 
+        new List<Messaging.SingleEmailMessage> {message};
+         Messaging.SendEmailResult[] results = Messaging.sendEmail(messages);
+        if (results[0].success) {
+        System.debug('The email was sent successfully.');
+        } else {
+        System.debug('The email failed to send: '
+        + results[0].errors[0].message);
+        }
+    }  
+
+}
